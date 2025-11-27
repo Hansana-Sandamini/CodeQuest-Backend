@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express"
 import { Role } from "../models/user.model"
 import jwt from "jsonwebtoken"
-import dotenv from "dotenv";
+import dotenv from "dotenv"
 
 dotenv.config()
 
