@@ -5,6 +5,7 @@ import dotenv from "dotenv"
 import bcrypt from "bcryptjs"
 import { signAccessToken, signRefreshToken } from "../utils/tokens"
 import { IUSER, Role, User } from "../models/user.model"
+import cloudinary from "../config/cloudinary"
 
 dotenv.config()
 
@@ -12,7 +13,7 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string
 
 export const registerUser = async (req: Request, res: Response) => {
     try {
-        const { firstname, lastname, username, email, password, profilePicture } = req.body
+        const { firstname, lastname, username, email, password } = req.body
 
         // Validate required fields
         if (!firstname || !lastname || !username || !email || !password) {
@@ -32,6 +33,26 @@ export const registerUser = async (req: Request, res: Response) => {
             })
         }
 
+        // If an image is uploaded => upload to Cloudinary
+        let profilePictureUrl = process.env.DEFAULT_PROFILE_PIC 
+
+        if (req.file) {
+            const result: any = await new Promise((resole, reject) => {
+                const upload_stream = cloudinary.uploader.upload_stream(
+                    { folder: "profile_pictures" },
+                    (error, result) => {
+                        if (error) {
+                            return reject(error)
+                        }
+                        resole(result)  // success return 
+                    }
+                )
+                upload_stream.end(req.file?.buffer)
+            })
+        
+            profilePictureUrl = result.secure_url
+        }
+
         // Hash password
         const hash = await bcrypt.hash(password, 10);
 
@@ -42,7 +63,7 @@ export const registerUser = async (req: Request, res: Response) => {
             email,
             password: hash,
             roles: [Role.USER],
-            profilePicture
+            profilePicture: profilePictureUrl
         })
 
         res.status(201).json({
