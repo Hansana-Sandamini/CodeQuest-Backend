@@ -2,7 +2,10 @@ import express from "express"
 import dotenv from "dotenv"
 import cors from "cors"
 import { connectDB } from "./config/db"
+import "./models/question.model"
+import "./models/language.model"
 import authRouter from "./routes/auth.routes"
+import languageRouter from "./routes/language.routes"
 
 dotenv.config()
 
@@ -19,6 +22,7 @@ app.use(
 )
 
 app.use("/api/v1/auth", authRouter)
+app.use("/api/v1/languages", languageRouter)
 
 const startServer = async () => {
     try {
