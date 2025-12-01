@@ -7,6 +7,7 @@ import "./models/language.model"
 import authRouter from "./routes/auth.routes"
 import languageRouter from "./routes/language.routes"
 import questionRouter from "./routes/question.routes"
+import hintRouter from "./routes/hint.routes"
 
 dotenv.config()
 
@@ -25,6 +26,7 @@ app.use(
 app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/languages", languageRouter)
 app.use("/api/v1/questions", questionRouter)
+app.use("/api/v1/hints", hintRouter)
 
 const startServer = async () => {
     try {
