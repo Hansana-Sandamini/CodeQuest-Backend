@@ -11,24 +11,24 @@ if (!JWT_SECRET) throw new Error("JWT_SECRET missing in .env")
 if (!JWT_REFRESH_SECRET) throw new Error("JWT_REFRESH_SECRET missing in .env")
 
 export const signAccessToken = (user: IUSER): string => {
-  return jwt.sign(
-    {
-      sub: user._id.toString(),
-      roles: user.roles
-    },
-    JWT_SECRET,
-    {
-      expiresIn: "30m"
-    }
-  )
+    return jwt.sign(
+        {
+            sub: user._id.toString(),
+            roles: user.roles
+        },
+        JWT_SECRET,
+        {
+            expiresIn: "30m"
+        }
+    )
 }
 
 export const signRefreshToken = (user: IUSER): string => {
-  return jwt.sign(
-    {
-      sub: user._id.toString()
-    },
-    JWT_REFRESH_SECRET,
-    { expiresIn: "7d" }
-  )
+    return jwt.sign(
+        {
+            sub: user._id.toString()
+        },
+        JWT_REFRESH_SECRET,
+        { expiresIn: "7d" }
+    )
 }

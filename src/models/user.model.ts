@@ -1,19 +1,19 @@
 import mongoose, { Document, Schema } from "mongoose"
 
 export enum Role {
-  ADMIN = "ADMIN",
-  USER = "USER"
+    ADMIN = "ADMIN",
+    USER = "USER"
 }
 
 export interface IUSER extends Document {
-  _id: mongoose.Types.ObjectId
-  firstname?: string
-  lastname?: string
-  username: string
-  email: string
-  password: string
-  roles: Role[]
-  profilePicture?: string
+    _id: mongoose.Types.ObjectId
+    firstname?: string
+    lastname?: string
+    username: string
+    email: string
+    password: string
+    roles: Role[]
+    profilePicture?: string
 }
 
 const userSchema = new Schema<IUSER>(
