@@ -1,14 +1,14 @@
 import mongoose, { Document, Schema } from "mongoose"
 
 export enum Difficulty {
-  EASY = "EASY",
-  MEDIUM = "MEDIUM",
-  HARD = "HARD",
+    EASY = "EASY",
+    MEDIUM = "MEDIUM",
+    HARD = "HARD",
 }
 
 export enum QuestionType {
-  MCQ = "MCQ",
-  CODING = "CODING",
+    MCQ = "MCQ",
+    CODING = "CODING",
 }
 
 export interface IQuestion extends Document {
