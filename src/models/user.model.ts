@@ -14,6 +14,17 @@ export interface IUSER extends Document {
     password: string
     roles: Role[]
     profilePicture?: string
+    badges: {
+        language: mongoose.Types.ObjectId
+        level: string         
+        earnedAt: Date
+    }[]
+    
+    certificates: {
+        language: mongoose.Types.ObjectId
+        url: string           
+        earnedAt: Date
+    }[]
 }
 
 const userSchema = new Schema<IUSER>(
@@ -25,6 +36,20 @@ const userSchema = new Schema<IUSER>(
         password: { type: String, required: true },
         roles: { type: [String], enum: Object.values(Role), default: [Role.USER] },
         profilePicture: { type: String },
+        badges: [
+            {
+                language: { type: Schema.Types.ObjectId, ref: "Language", required: true },
+                level: { type: String, required: true },
+                earnedAt: { type: Date, default: Date.now },
+            },
+        ],
+        certificates: [
+            {
+                language: { type: Schema.Types.ObjectId, ref: "Language", required: true },
+                url: { type: String, required: true },
+                earnedAt: { type: Date, default: Date.now },
+            },
+        ],
     },
     { timestamps: true }
 )
