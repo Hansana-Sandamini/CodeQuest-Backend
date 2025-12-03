@@ -39,7 +39,14 @@ export const registerUser = async (req: Request, res: Response) => {
         if (req.file) {
             const result: any = await new Promise((resole, reject) => {
                 const upload_stream = cloudinary.uploader.upload_stream(
-                    { folder: "profile_pictures" },
+                    { 
+                        folder: "profile_pictures",
+                        transformation: [
+                            { width: 500, height: 500, crop: "limit" },
+                            { quality: "auto" },
+                            { fetch_format: "auto" }
+                        ]
+                    },
                     (error, result) => {
                         if (error) {
                             return reject(error)
@@ -54,7 +61,7 @@ export const registerUser = async (req: Request, res: Response) => {
         }
 
         // Hash password
-        const hash = await bcrypt.hash(password, 10);
+        const hash = await bcrypt.hash(password, 10)
 
         const user = await User.create({
             firstname,

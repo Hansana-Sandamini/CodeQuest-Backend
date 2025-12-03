@@ -10,6 +10,7 @@ import questionRouter from "./routes/question.routes"
 import hintRouter from "./routes/hint.routes"
 import progressRouter from "./routes/progress.routes"
 import leaderboardRouter from "./routes/leaderboard.routes"
+import userRouter from "./routes/user.routes"
 
 dotenv.config()
 
@@ -31,6 +32,7 @@ app.use("/api/v1/questions", questionRouter)
 app.use("/api/v1/hints", hintRouter)
 app.use("/api/v1/progress", progressRouter)
 app.use("/api/v1/leaderboard", leaderboardRouter)
+app.use("/api/v1/users", userRouter)
 
 const startServer = async () => {
     try {
