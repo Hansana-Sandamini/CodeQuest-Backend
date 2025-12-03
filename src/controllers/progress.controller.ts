@@ -2,7 +2,7 @@ import { Request, Response } from "express"
 import { AuthRequest } from "../middlewares/auth.middleware"
 import { Progress, ProgressStatus } from "../models/progress.model"
 import { Question, Difficulty } from "../models/question.model"
-import { User } from "../models/user.model"
+import { Role, User } from "../models/user.model"
 import { Language } from "../models/language.model"
 import { executeCode, languageToId } from "../utils/judge0"
 import PDFDocument from "pdfkit"
@@ -70,6 +70,7 @@ export const submitAnswer = async (req: AuthRequest, res: Response) => {
             progress.status = ProgressStatus.COMPLETED
             progress.completedAt = new Date()
             progress.pointsEarned = getPoints(question.difficulty)
+            await updateStreak(userId)
         }
 
         await progress.save()
@@ -105,6 +106,9 @@ function getPoints(difficulty: Difficulty): number {
 
 // BADGES (20–80%) + CERTIFICATE ONLY AT 100%
 async function awardBadgesAndCertificate(userId: string, languageIdStr: string) {
+     const user = await User.findById(userId)
+    if (!user || !user.roles.includes(Role.USER)) return  // skip admins
+
     const languageId = new mongoose.Types.ObjectId(languageIdStr)
 
     // Get language + total questions
@@ -330,4 +334,52 @@ export const getUserProgress = async (req: AuthRequest, res: Response) => {
         console.error("Get Progress Error:", err)
         res.status(500).json({ message: "Server error" })
     }
+}
+
+// Helper: Update streak 
+async function updateStreak(userId: string) {
+    const user = await User.findById(userId);
+    if (!user) return;
+
+    // Only learners (role USER) get streaks — skip admins
+    if (!user.roles.includes(Role.USER)) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day 
+
+    let currentStreak = user.currentStreak ?? 0;
+    let longestStreak = user.longestStreak ?? 0;
+
+    if (user.lastActiveDate) {
+        const lastActive = new Date(user.lastActiveDate);
+        lastActive.setHours(0, 0, 0, 0);
+
+        const diffDays = Math.floor(
+            (today.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        if (diffDays === 1) {
+            // Consecutive day → increase streak
+            currentStreak += 1;
+        } else if (diffDays > 1) {
+            // Streak broken → reset to 1 (since they solved today)
+            currentStreak = 1;
+        }
+        // diffDays === 0 → same day, no change needed
+    } else {
+        // First time ever solving a question
+        currentStreak = 1;
+    }
+
+    // Update longest streak if current one is bigger
+    if (currentStreak > longestStreak) {
+        longestStreak = currentStreak;
+    }
+
+    // Save updated values
+    user.currentStreak = currentStreak;
+    user.longestStreak = longestStreak;
+    user.lastActiveDate = today;
+
+    await user.save();
 }

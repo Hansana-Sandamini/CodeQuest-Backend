@@ -5,8 +5,19 @@ export enum Role {
     USER = "USER"
 }
 
-export interface IUSER extends Document {
-    _id: mongoose.Types.ObjectId
+export interface IBadge {
+    language: mongoose.Types.ObjectId
+    level: string
+    earnedAt: Date
+}
+
+export interface ICertificate {
+    language: mongoose.Types.ObjectId
+    url: string
+    earnedAt: Date
+}
+
+export interface IUser extends Document {
     firstname?: string
     lastname?: string
     username: string
@@ -14,20 +25,14 @@ export interface IUSER extends Document {
     password: string
     roles: Role[]
     profilePicture?: string
-    badges: {
-        language: mongoose.Types.ObjectId
-        level: string         
-        earnedAt: Date
-    }[]
-    
-    certificates: {
-        language: mongoose.Types.ObjectId
-        url: string           
-        earnedAt: Date
-    }[]
+    badges?: IBadge[]        // only for USERS
+    certificates?: ICertificate[]  // only for USERS
+    currentStreak?: number    // only for USERS
+    longestStreak?: number    // only for USERS
+    lastActiveDate?: Date     // only for USERS
 }
 
-const userSchema = new Schema<IUSER>(
+const userSchema = new Schema<IUser>(
     {
         firstname: { type: String, required: true },
         lastname: { type: String, required: true },
@@ -36,6 +41,8 @@ const userSchema = new Schema<IUSER>(
         password: { type: String, required: true },
         roles: { type: [String], enum: Object.values(Role), default: [Role.USER] },
         profilePicture: { type: String },
+
+        // Only relevant for users
         badges: [
             {
                 language: { type: Schema.Types.ObjectId, ref: "Language", required: true },
@@ -50,8 +57,11 @@ const userSchema = new Schema<IUSER>(
                 earnedAt: { type: Date, default: Date.now },
             },
         ],
+        currentStreak: { type: Number, default: 0 },
+        longestStreak: { type: Number, default: 0 },
+        lastActiveDate: { type: Date },
     },
     { timestamps: true }
 )
 
-export const User = mongoose.model<IUSER>("User", userSchema)
+export const User = mongoose.model<IUser>("User", userSchema)

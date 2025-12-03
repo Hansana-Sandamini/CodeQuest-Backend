@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken"
 import dotenv from "dotenv"
 import bcrypt from "bcryptjs"
 import { signAccessToken, signRefreshToken } from "../utils/tokens"
-import { IUSER, Role, User } from "../models/user.model"
+import { Role, User } from "../models/user.model"
 import cloudinary from "../config/cloudinary"
 
 dotenv.config()
@@ -166,6 +166,26 @@ export const getMyProfile = async (req: AuthRequest, res: Response) => {
             return res.status(404).json({ message: "User not found" })
         }
 
+        const isAdmin = user.roles.includes(Role.ADMIN)
+
+        // IF ADMIN → Return ONLY basic fields
+        if (isAdmin) {
+            return res.status(200).json({
+                message: "Profile fetched successfully",
+                data: {
+                    id: user._id,
+                    firstname: user.firstname,
+                    lastname: user.lastname,
+                    username: user.username,
+                    email: user.email,
+                    profilePicture: user.profilePicture,
+                    roles: user.roles
+                    // No badges, no certificates, no streaks
+                }
+            })
+        }
+
+        // IF NORMAL USER → Return full profile
         const profileData = {
             id: user._id,
             firstname: user.firstname,
@@ -193,7 +213,10 @@ export const getMyProfile = async (req: AuthRequest, res: Response) => {
                     name: (cert.language as any)?.name || "Unknown Language",
                     iconUrl: (cert.language as any)?.iconUrl || null
                 }
-            }))
+            })),
+
+            currentStreak: user.currentStreak || 0,
+            longestStreak: user.longestStreak || 0
         }
 
         return res.status(200).json({
