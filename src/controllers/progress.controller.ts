@@ -6,7 +6,6 @@ import { User } from "../models/user.model"
 import { Language } from "../models/language.model"
 import { executeCode, languageToId } from "../utils/judge0"
 import PDFDocument from "pdfkit"
-import blobStream from "blob-stream"
 import cloudinary from "../config/cloudinary"
 import mongoose from "mongoose"
 
@@ -24,7 +23,7 @@ export const submitAnswer = async (req: AuthRequest, res: Response) => {
             progress = new Progress({
                 user: userId,
                 question: questionId,
-                language: question.language,
+                language: question.language._id,
                 difficulty: question.difficulty,
                 type: question.type,
                 status: ProgressStatus.IN_PROGRESS,
@@ -76,7 +75,7 @@ export const submitAnswer = async (req: AuthRequest, res: Response) => {
         await progress.save()
 
         // Award badges + certificate
-        await awardBadgesAndCertificate(userId, question.language.toString())
+        await awardBadgesAndCertificate(userId, question.language._id.toString())
 
         res.json({
             message: "Answer submitted successfully",
@@ -104,87 +103,99 @@ function getPoints(difficulty: Difficulty): number {
     }
 }
 
-// BADGES & CERTIFICATE LOGIC 
+// BADGES (20–80%) + CERTIFICATE ONLY AT 100%
 async function awardBadgesAndCertificate(userId: string, languageIdStr: string) {
-    const languageObjectId = new mongoose.Types.ObjectId(languageIdStr)
+    const languageId = new mongoose.Types.ObjectId(languageIdStr)
 
-    // Count correctly solved questions in this language
-    const completedCount = await Progress.countDocuments({
-        user: userId,
-        language: languageObjectId,
-        isCorrect: true,
-    })
-
-    const language = await Language.findById(languageObjectId)
-    if (!language) return
+    // Get language + total questions
+    const language = await Language.findById(languageId).select("name questions")
+    if (!language || language.questions.length === 0) return
 
     const totalQuestions = language.questions.length
 
-    // Award Badges 
-    const milestones: { [key: number]: string } = {
-        5: "Novice",
-        10: "Intermediate",
-        20: "Advanced",
-        30: "Expert",
-    }
+    // Count correctly solved questions
+    const completedCount = await Progress.countDocuments({
+        user: userId,
+        language: languageId,
+        isCorrect: true,
+        status: ProgressStatus.COMPLETED,
+    })
 
-    for (const [count, level] of Object.entries(milestones)) {
-        const countNum = parseInt(count)
-        if (completedCount >= countNum) {
-            const alreadyHasBadge = await User.exists({
+    const percentage = Math.round((completedCount / totalQuestions) * 100)
+
+    // Badge milestones
+    const badgeMilestones = [
+        { percent: 20, level: "Bronze Learner", color: "#CD7F32" },
+        { percent: 40, level: "Silver Coder", color: "#C0C0C0" },
+        { percent: 60, level: "Gold Developer", color: "#FFD700" },
+        { percent: 80, level: "Platinum Master", color: "#E5E4E2" },
+    ]
+
+    // Award badges if milestone reached and not already owned
+    for (const milestone of badgeMilestones) {
+        if (percentage >= milestone.percent) {
+            const exists = await User.exists({
                 _id: userId,
-                "badges.language": languageObjectId,
-                "badges.level": level,
+                "badges.language": languageId,
+                "badges.level": milestone.level,
             })
 
-            if (!alreadyHasBadge) {
+            if (!exists) {
                 await User.updateOne(
                     { _id: userId },
                     {
                         $push: {
                             badges: {
-                                language: languageObjectId,
-                                level,
+                                language: languageId,
+                                level: milestone.level,
+                                percentage: milestone.percent,
+                                color: milestone.color,
                                 earnedAt: new Date(),
                             },
                         },
                     }
                 )
+                console.log(`Badge awarded: ${milestone.level} (${milestone.percent}%) – ${language.name}`)
             }
         }
     }
 
-    // Issue Certificate on 100% Completion 
-    if (completedCount === totalQuestions && totalQuestions > 0) {
-        const alreadyHasCert = await User.exists({
+    // CERTIFICATE ONLY AT 100%
+    if (percentage === 100) {
+        const hasCertificate = await User.exists({
             _id: userId,
-            "certificates.language": languageObjectId,
+            "certificates.language": languageId,
         })
 
-        if (!alreadyHasCert) {
+        if (!hasCertificate) {
             const user = await User.findById(userId).select("firstname lastname username")
             if (!user) return
 
-            // Build full name properly
-            const nameParts = [user.firstname, user.lastname].filter(Boolean)
-            const fullName = nameParts.length > 0
-                ? nameParts.join(" ").trim()
-                : (user.username || "CodeQuest Champion")
+            const fullName =
+                [user.firstname, user.lastname].filter(Boolean).join(" ").trim() ||
+                user.username ||
+                "CodeQuest Champion"
 
-            const certUrl = await generateCertificate(fullName, language.name, userId)
+            try {
+                const certificateUrl = await generateCertificate(fullName, language.name, userId)
 
-            await User.updateOne(
-                { _id: userId },
-                {
-                    $push: {
-                        certificates: {
-                            language: languageObjectId,
-                            url: certUrl,
-                            earnedAt: new Date(),
+                await User.updateOne(
+                    { _id: userId },
+                    {
+                        $push: {
+                            certificates: {
+                                language: languageId,
+                                url: certificateUrl,
+                                earnedAt: new Date(),
+                            },
                         },
-                    },
-                }
-            )
+                    }
+                )
+
+                console.log(`Certificate issued: ${fullName} mastered ${language.name}!`)
+            } catch (err) {
+                console.error("Certificate generation failed:", err)
+            }
         }
     }
 }
@@ -201,53 +212,15 @@ async function generateCertificate(
             layout: "landscape",
             margin: 50,
         })
-        const stream = doc.pipe(blobStream())
 
-        // Background
-        doc.rect(0, 0, doc.page.width, doc.page.height).fill("#f8f9fa")
-
-        // Title
-        doc.fontSize(48)
-           .fillColor("#2c3e50")
-           .text("Certificate of Completion", { align: "center" })
-
-        // Subtitle
-        doc.moveDown(2)
-           .fontSize(28)
-           .fillColor("#34495e")
-           .text("This certifies that", { align: "center" })
-
-        // User Full Name
-        doc.moveDown(0.5)
-           .fontSize(42)
-           .fillColor("#e74c3c")
-           .text(userName, { align: "center" })
-
-        // Achievement
-        doc.moveDown(1)
-           .fontSize(26)
-           .fillColor("#2c3e50")
-           .text("has successfully mastered all challenges in", { align: "center" })
-
-        doc.moveDown(0.5)
-           .fontSize(36)
-           .fillColor("#3498db")
-           .text(languageName, { align: "center" })
-
-        // Date
-        doc.moveDown(3)
-           .fontSize(18)
-           .fillColor("#7f8c8d")
-           .text(`Issued on ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`, { align: "center" })
-
-        doc.end()
-
-        stream.on("finish", async () => {
-            const buffer = stream.toBlob("application/pdf") as unknown as Buffer
+        const chunks: Buffer[] = []
+        doc.on("data", (chunk) => chunks.push(chunk as Buffer))
+        doc.on("end", async () => {
+            const pdfBuffer = Buffer.concat(chunks)
 
             try {
                 const result: any = await new Promise((res, rej) => {
-                    const uploadStream = cloudinary.uploader.upload_stream(
+                    cloudinary.uploader.upload_stream(
                         {
                             folder: "codequest_certificates",
                             format: "pdf",
@@ -259,8 +232,7 @@ async function generateCertificate(
                             if (error) rej(error)
                             else res(result)
                         }
-                    )
-                    uploadStream.end(buffer)
+                    ).end(pdfBuffer)
                 })
                 resolve(result.secure_url)
             } catch (err) {
@@ -269,7 +241,72 @@ async function generateCertificate(
             }
         })
 
-        stream.on("error", reject)
+        doc.on("error", reject)
+
+        const pageWidth = doc.page.width
+        const centerX = pageWidth / 2
+
+        // Background
+        doc.rect(0, 0, pageWidth, doc.page.height).fill("#f8f9fa")
+
+        // Title 
+        doc.fontSize(48)
+           .fillColor("#2c3e50")
+           .text("Certificate of Completion", 0, 120, {
+               width: pageWidth,
+               align: "center",
+           })
+
+        // Subtitle
+        doc.fontSize(28)
+           .fillColor("#34495e")
+           .text("This certifies that", 0, 220, {
+               width: pageWidth,
+               align: "center",
+           })
+
+        // User Full Name
+        doc.fontSize(42)
+           .fillColor("#e74c3c")
+           .text(userName, 0, 280, {
+               width: pageWidth,
+               align: "center",
+           })
+
+        // Achievement
+        doc.fontSize(26)
+           .fillColor("#2c3e50")
+           .text("has successfully mastered all challenges in", 0, 360, {
+               width: pageWidth,
+               align: "center",
+           })
+
+        // Language Name
+        doc.fontSize(36)
+           .fillColor("#3498db")
+           .text(languageName, 0, 410, {
+               width: pageWidth,
+               align: "center",
+           })
+
+        // Date
+        doc.fontSize(18)
+           .fillColor("#7f8c8d")
+           .text(
+               `Issued on ${new Date().toLocaleDateString("en-US", {
+                   year: "numeric",
+                   month: "long",
+                   day: "numeric",
+               })}`,
+               0,
+               500,
+               {
+                   width: pageWidth,
+                   align: "center",
+               }
+           )
+
+        doc.end()
     })
 }
 

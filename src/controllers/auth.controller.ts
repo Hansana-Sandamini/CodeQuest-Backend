@@ -144,21 +144,65 @@ export const refreshToken = async (req: Request, res: Response) => {
     }
 }
 
-export const getMyProfile = async (req: AuthRequest, res:Response) => {
-    if (!req.user) {
-        return res.status(401).json({message: "Unauthorized"})
+export const getMyProfile = async (req: AuthRequest, res: Response) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ message: "Unauthorized" })
+        }
+
+        const user = await User.findById(req.user.sub)
+            .select("-password -__v")
+            .populate({
+                path: "badges.language",
+                select: "name iconUrl"
+            })
+            .populate({
+                path: "certificates.language",
+                select: "name iconUrl"
+            })
+            .lean()
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" })
+        }
+
+        const profileData = {
+            id: user._id,
+            firstname: user.firstname,
+            lastname: user.lastname,
+            username: user.username,
+            email: user.email,
+            profilePicture: user.profilePicture,
+            roles: user.roles,
+
+            badges: (user.badges || []).map((badge: any) => ({
+                level: badge.level,
+                earnedAt: badge.earnedAt,
+                language: {
+                    _id: badge.language?._id,
+                    name: (badge.language as any)?.name || "Unknown Language",
+                    iconUrl: (badge.language as any)?.iconUrl || null
+                }
+            })),
+
+            certificates: (user.certificates || []).map((cert: any) => ({
+                url: cert.url,
+                earnedAt: cert.earnedAt,
+                language: {
+                    _id: cert.language?._id,
+                    name: (cert.language as any)?.name || "Unknown Language",
+                    iconUrl: (cert.language as any)?.iconUrl || null
+                }
+            }))
+        }
+
+        return res.status(200).json({
+            message: "Profile fetched successfully",
+            data: profileData
+        })
+
+    } catch (error: any) {
+        console.error("getMyProfile Error:", error)
+        return res.status(500).json({ message: "Server error" })
     }
-
-    const user = await User.findById(req.user.sub).select("-password") // exclude password
-
-    if (!user) {
-        return res.status(404).json({message: "User not found"})
-    }
-
-    const { email, roles, _id } = user as IUSER
-
-    res.status(200).json({
-        message: "User profile fetched successfully",
-        data: { id: _id, email, roles }
-    })
 }
