@@ -28,11 +28,11 @@ export const createQuestion = async (req: Request, res: Response) => {
 
         // MCQ validation
         if (type === QuestionType.MCQ) {
-            if (!Array.isArray(options) || options.length !== 5) {
-                return res.status(400).json({ message: "MCQ must have exactly 5 options" })
+            if (!Array.isArray(options) || options.length !== 4) {
+                return res.status(400).json({ message: "MCQ must have exactly 4 options" })
             }
-            if (correctAnswer === undefined || correctAnswer < 0 || correctAnswer > 4) {
-                return res.status(400).json({ message: "correctAnswer must be 0–4" })
+            if (correctAnswer === undefined || correctAnswer < 0 || correctAnswer > 3) {
+                return res.status(400).json({ message: "correctAnswer must be 0–3" })
             }
         }
 
@@ -112,26 +112,47 @@ export const updateQuestion = async (req: Request, res: Response) => {
         const { id } = req.params
         const updates = req.body
 
-        const allowed = ["title", "description", "difficulty", "options"]
+        // Allow these fields for admin updates
+        const allowed = ["title", "description", "difficulty", "options", "correctAnswer", "testCases"]
+
         const safeUpdates: any = {}
         allowed.forEach((field) => {
-            if (updates[field] !== undefined) safeUpdates[field] = updates[field]
+            if (updates[field] !== undefined) {
+                safeUpdates[field] = updates[field]
+            }
         })
 
-        const question = await Question.findByIdAndUpdate(
+        const question = await Question.findById(id)
+        if (!question) return res.status(404).json({ message: "Question not found" })
+
+        if (question.type === "MCQ") {
+            if (safeUpdates.options && (!Array.isArray(safeUpdates.options) || safeUpdates.options.length !== 4)) {
+                return res.status(400).json({ message: "MCQ must have exactly 4 options" })
+            }
+            if (safeUpdates.correctAnswer !== undefined && (safeUpdates.correctAnswer < 0 || safeUpdates.correctAnswer > 3)) {
+                return res.status(400).json({ message: "correctAnswer must be 0–3" })
+            }
+        }
+
+        if (question.type === "CODING") {
+            if (safeUpdates.testCases && (!Array.isArray(safeUpdates.testCases) || safeUpdates.testCases.length === 0)) {
+                return res.status(400).json({ message: "At least one test case required for coding questions" })
+            }
+        }
+
+        const updatedQuestion = await Question.findByIdAndUpdate(
             id,
             { $set: safeUpdates },
             { new: true, runValidators: true }
         )
-            .select("-correctAnswer -testCases")
+            .select("-correctAnswer -testCases")   // hide from public response
             .populate("language", "name iconUrl")
 
-        if (!question) return res.status(404).json({ message: "Question not found" })
+        res.json({ message: "Question updated", data: updatedQuestion })
 
-        res.json({ message: "Question updated", data: question })
-
-    } catch (err) {
-        res.status(500).json({ message: "Server error" })
+    } catch (err: any) {
+        console.error(err)
+        res.status(500).json({ message: err.message || "Server error" })
     }
 }
 
@@ -153,4 +174,39 @@ export const deleteQuestion = async (req: Request, res: Response) => {
     } catch (err) {
         res.status(500).json({ message: "Server error" })
     }
+}
+
+export const getQuestionFull = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params
+
+        const question = await Question.findById(id)
+            .populate("language", "name iconUrl")
+
+        if (!question) {
+            return res.status(404).json({ message: "Question not found" })
+        }
+
+        res.json({ data: question })
+
+    } catch (err) {
+        console.error("Get Full Question Error:", err)
+        res.status(500).json({ message: "Server error" })
+    }
+}
+
+export const getQuestionById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const question = await Question.findById(id)
+      .select("-correctAnswer")  // Hide correctAnswer for MCQ
+      .populate("language", "name iconUrl")
+
+    if (!question) return res.status(404).json({ message: "Question not found" })
+
+    res.json({ data: question })
+  } catch (err) {
+    console.error("Get Question Error:", err)
+    res.status(500).json({ message: "Server error" })
+  }
 }

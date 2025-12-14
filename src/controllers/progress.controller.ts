@@ -338,37 +338,37 @@ export const getUserProgress = async (req: AuthRequest, res: Response) => {
 
 // Helper: Update streak 
 async function updateStreak(userId: string) {
-    const user = await User.findById(userId);
-    if (!user) return;
+    const user = await User.findById(userId)
+    if (!user) return
 
     // Only learners (role USER) get streaks — skip admins
-    if (!user.roles.includes(Role.USER)) return;
+    if (!user.roles.includes(Role.USER)) return
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day 
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Normalize to start of day 
 
-    let currentStreak = user.currentStreak ?? 0;
-    let longestStreak = user.longestStreak ?? 0;
+    let currentStreak = user.currentStreak ?? 0
+    let longestStreak = user.longestStreak ?? 0
 
     if (user.lastActiveDate) {
-        const lastActive = new Date(user.lastActiveDate);
-        lastActive.setHours(0, 0, 0, 0);
+        const lastActive = new Date(user.lastActiveDate)
+        lastActive.setHours(0, 0, 0, 0)
 
         const diffDays = Math.floor(
             (today.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        )
 
         if (diffDays === 1) {
             // Consecutive day → increase streak
-            currentStreak += 1;
+            currentStreak += 1
         } else if (diffDays > 1) {
             // Streak broken → reset to 1 (since they solved today)
-            currentStreak = 1;
+            currentStreak = 1
         }
         // diffDays === 0 → same day, no change needed
     } else {
         // First time ever solving a question
-        currentStreak = 1;
+        currentStreak = 1
     }
 
     // Update longest streak if current one is bigger
@@ -377,9 +377,9 @@ async function updateStreak(userId: string) {
     }
 
     // Save updated values
-    user.currentStreak = currentStreak;
-    user.longestStreak = longestStreak;
-    user.lastActiveDate = today;
+    user.currentStreak = currentStreak
+    user.longestStreak = longestStreak
+    user.lastActiveDate = today
 
-    await user.save();
+    await user.save()
 }

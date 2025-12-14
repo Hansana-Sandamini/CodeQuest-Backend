@@ -44,7 +44,7 @@ export async function executeCode(
         let statusResponse
         let attempts = 0
         do {
-            await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1s
+            await new Promise((resolve) => setTimeout(resolve, 1000))  // Wait 1s
             statusResponse = await axios.get(
                 `https://${RAPIDAPI_HOST}/submissions/${token}?base64_encoded=false&fields=*`,
                 {
@@ -55,11 +55,13 @@ export async function executeCode(
                 }
             )
             attempts++;
-            if (attempts > 10) throw new Error("Timeout waiting for Judge0 result");
+            if (attempts > 10) throw new Error("Timeout waiting for Judge0 result")
         } while (statusResponse.data.status.id <= 2) // 1: in queue, 2: processing
 
         const result = statusResponse.data
-        const passed = result.status.id === 3 && result.stdout?.trim() === expectedOutput.trim()
+        // const passed = result.status.id === 3 && result.stdout?.trim() === expectedOutput.trim()
+        const passed = result.status.id === 3 && result.stdout?.trim().replace(/\r\n/g, "\n") === expectedOutput.trim().replace(/\r\n/g, "\n")
+
         results.push(result)
         if (!passed) allPassed = false
     }

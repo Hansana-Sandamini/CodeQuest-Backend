@@ -48,25 +48,25 @@ export const updateMyProfile = async (req: AuthRequest, res: Response) => {
         // Validate username if provided
         if (username) {
             if (username.length < 3 || username.includes(" ")) {
-            return res.status(400).json({ message: "Username must be at least 3 chars, no spaces" })
+                return res.status(400).json({ message: "Username must be at least 3 chars, no spaces" })
             }
 
             const existing = await User.findOne({
-            username: username.toLowerCase(),
-            _id: { $ne: req.user.sub }
+                username: username.toLowerCase(),
+                _id: { $ne: req.user.sub }
             })
 
             if (existing) {
-            return res.status(400).json({ message: "Username already taken" })
+                return res.status(400).json({ message: "Username already taken" })
             }
         }
 
         const updated = await User.findByIdAndUpdate(
             req.user.sub,
             {
-            firstname,
-            lastname,
-            username: username ? username.toLowerCase() : undefined,
+                firstname,
+                lastname,
+                username: username ? username.toLowerCase() : undefined,
             },
             { new: true, runValidators: true }
         ).select("-password -__v")
@@ -100,18 +100,18 @@ export const updateProfilePicture = async (req: AuthRequest, res: Response) => {
 
         const upload: any = await new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
-            {
-                folder: "profile_pictures",
-                transformation: [
-                { width: 500, height: 500, crop: "limit" },
-                { quality: "auto" },
-                { fetch_format: "auto" }
-                ]
-            },
-            (err, result) => {
-                if (err) reject(err)
-                else resolve(result)
-            }
+                {
+                    folder: "profile_pictures",
+                    transformation: [
+                        { width: 500, height: 500, crop: "limit" },
+                        { quality: "auto" },
+                        { fetch_format: "auto" }
+                    ]
+                },
+                (err, result) => {
+                    if (err) reject(err)
+                    else resolve(result)
+                }
             )
             stream.end(req.file!.buffer)
         })

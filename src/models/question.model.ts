@@ -17,8 +17,8 @@ export interface IQuestion extends Document {
     description: string
     difficulty: Difficulty
     type: QuestionType
-    options?: string[]   // For MCQ: 5 options
-    correctAnswer?: number   // For MCQ: Index of correct option (0-4)
+    options?: string[]   // For MCQ: 4 options
+    correctAnswer?: number   // For MCQ: Index of correct option (0-3)
     testCases?: { input: string; expectedOutput: string }[]   // For CODING
 }
 
