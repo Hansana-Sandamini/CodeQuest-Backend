@@ -6,6 +6,8 @@ import bcrypt from "bcryptjs"
 import { signAccessToken, signRefreshToken } from "../utils/tokens"
 import { Role, User } from "../models/user.model"
 import cloudinary from "../config/cloudinary"
+import { EmailService } from "../config/mail"
+import crypto from "crypto"
 
 dotenv.config()
 
@@ -73,13 +75,16 @@ export const registerUser = async (req: Request, res: Response) => {
             profilePicture: profilePictureUrl
         })
 
+        // Send welcome email
+        await EmailService.sendWelcome(user.email, user.username)
+
         res.status(201).json({
             message: "User registered successfully",
             data: { email: user.email, roles: user.roles },
         })
 
     } catch (err) {
-        console.error(err);
+        console.error(err)
         res.status(500).json({ message: "Internal server error" })
     }
 }
@@ -234,5 +239,71 @@ export const getMyProfile = async (req: AuthRequest, res: Response) => {
     } catch (error: any) {
         console.error("getMyProfile Error:", error)
         return res.status(500).json({ message: "Server error" })
+    }
+}
+
+// Forgot Password - Send OTP 
+export const forgotPassword = async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body
+        if (!email) return res.status(400).json({ message: "Email required" })
+
+        const user = await User.findOne({ email: email.toLowerCase().trim() })
+
+        if (!user) {
+            return res.status(200).json({ message: "If the email exists, an OTP has been sent." })
+        }
+
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString()
+        const hashedOtp = await bcrypt.hash(otp, 10)
+
+        // Save to user (expires in 10 min)
+        user.resetOtp = hashedOtp
+        user.resetOtpExpires = new Date(Date.now() + 10 * 60 * 1000)
+        await user.save()
+
+        // Send OTP email
+        await EmailService.sendPasswordResetOtp(user.email, otp)
+
+        res.status(200).json({ message: "If the email exists, an OTP has been sent." })
+
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ message: "Server error" })
+    }
+}
+
+// Verify OTP and Reset Password
+export const resetPasswordWithOtp = async (req: Request, res: Response) => {
+    try {
+        const { email, otp, newPassword } = req.body
+        if (!email || !otp || !newPassword) {
+            return res.status(400).json({ message: "Email, OTP, and new password required" })
+        }
+
+        const user = await User.findOne({
+            email: email.toLowerCase().trim(),
+            resetOtpExpires: { $gt: Date.now() }, 
+        })
+
+        if (!user || !user.resetOtp || !(await bcrypt.compare(otp, user.resetOtp))) {
+            return res.status(400).json({ message: "Invalid or expired OTP" })
+        }
+
+        // Hash new password
+        const hash = await bcrypt.hash(newPassword, 10)
+        user.password = hash
+
+        // Clear OTP fields
+        user.resetOtp = undefined
+        user.resetOtpExpires = undefined
+        await user.save()
+
+        res.status(200).json({ message: "Password reset successfully" })
+
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ message: "Server error" })
     }
 }

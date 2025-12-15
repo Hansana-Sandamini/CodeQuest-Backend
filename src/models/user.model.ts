@@ -25,11 +25,18 @@ export interface IUser extends Document {
     password: string
     roles: Role[]
     profilePicture?: string
-    badges?: IBadge[]        // only for USERS
-    certificates?: ICertificate[]  // only for USERS
-    currentStreak?: number    // only for USERS
-    longestStreak?: number    // only for USERS
-    lastActiveDate?: Date     // only for USERS
+
+    // Only for USERS
+    badges?: IBadge[]        
+    certificates?: ICertificate[]  
+    currentStreak?: number   
+    longestStreak?: number    
+    lastActiveDate?: Date     
+
+    // Password reset
+    resetOtp?: string
+    resetOtpExpires?: Date
+
 }
 
 const userSchema = new Schema<IUser>(
@@ -60,6 +67,9 @@ const userSchema = new Schema<IUser>(
         currentStreak: { type: Number, default: 0 },
         longestStreak: { type: Number, default: 0 },
         lastActiveDate: { type: Date },
+
+        resetOtp: { type: String },
+        resetOtpExpires: { type: Date },
     },
     { timestamps: true }
 )

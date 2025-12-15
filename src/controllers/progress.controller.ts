@@ -8,6 +8,7 @@ import { executeCode, languageToId } from "../utils/judge0"
 import PDFDocument from "pdfkit"
 import cloudinary from "../config/cloudinary"
 import mongoose from "mongoose"
+import { EmailService } from "../config/mail"
 
 export const submitAnswer = async (req: AuthRequest, res: Response) => {
     try {
@@ -159,6 +160,15 @@ async function awardBadgesAndCertificate(userId: string, languageIdStr: string) 
                         },
                     }
                 )
+
+                // Send email
+                await EmailService.sendNewBadge(
+                    user.email,
+                    user.username,
+                    milestone.level,
+                    language.name
+                )
+
                 console.log(`Badge awarded: ${milestone.level} (${milestone.percent}%) – ${language.name}`)
             }
         }
@@ -172,7 +182,7 @@ async function awardBadgesAndCertificate(userId: string, languageIdStr: string) 
         })
 
         if (!hasCertificate) {
-            const user = await User.findById(userId).select("firstname lastname username")
+            const user = await User.findById(userId).select("firstname lastname username email")
             if (!user) return
 
             const fullName =
@@ -194,6 +204,14 @@ async function awardBadgesAndCertificate(userId: string, languageIdStr: string) 
                             },
                         },
                     }
+                )
+
+                // Send email
+                await EmailService.sendNewCertificate(
+                    user.email,
+                    user.username,
+                    language.name,
+                    "Mastery"
                 )
 
                 console.log(`Certificate issued: ${fullName} mastered ${language.name}!`)
@@ -373,7 +391,7 @@ async function updateStreak(userId: string) {
 
     // Update longest streak if current one is bigger
     if (currentStreak > longestStreak) {
-        longestStreak = currentStreak;
+        longestStreak = currentStreak
     }
 
     // Save updated values
