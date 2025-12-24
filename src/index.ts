@@ -11,6 +11,7 @@ import hintRouter from "./routes/hint.routes"
 import progressRouter from "./routes/progress.routes"
 import leaderboardRouter from "./routes/leaderboard.routes"
 import userRouter from "./routes/user.routes"
+import googleAuthRouter from './routes/google-auth.routes'
 
 dotenv.config()
 
@@ -27,6 +28,7 @@ app.use(
 )
 
 app.use("/api/v1/auth", authRouter)
+app.use('/api/v1/auth', googleAuthRouter)
 app.use("/api/v1/languages", languageRouter)
 app.use("/api/v1/questions", questionRouter)
 app.use("/api/v1/hints", hintRouter)

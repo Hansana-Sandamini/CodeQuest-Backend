@@ -37,6 +37,7 @@ export interface IUser extends Document {
     resetOtp?: string
     resetOtpExpires?: Date
 
+    googleId?: string
 }
 
 const userSchema = new Schema<IUser>(
@@ -70,6 +71,8 @@ const userSchema = new Schema<IUser>(
 
         resetOtp: { type: String },
         resetOtpExpires: { type: Date },
+
+        googleId: { type: String, sparse: true, unique: true },
     },
     { timestamps: true }
 )

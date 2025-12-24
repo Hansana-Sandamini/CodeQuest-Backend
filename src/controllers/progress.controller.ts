@@ -54,7 +54,7 @@ export const submitAnswer = async (req: AuthRequest, res: Response) => {
 
             progress.codeSolution = code
 
-            const lang = await Language.findById(question.language)
+            const lang = await Language.findById(question.language._id)
             if (!lang) return res.status(404).json({ message: "Language not found" })
 
             const languageId = languageToId[lang.name]
@@ -162,12 +162,16 @@ async function awardBadgesAndCertificate(userId: string, languageIdStr: string) 
                 )
 
                 // Send email
-                await EmailService.sendNewBadge(
-                    user.email,
-                    user.username,
-                    milestone.level,
-                    language.name
-                )
+                try {
+                    await EmailService.sendNewBadge(
+                        user.email,
+                        user.username,
+                        milestone.level,
+                        language.name
+                    )
+                } catch (emailErr) {
+                    console.error(`Failed to send email for badge ${milestone.level} to user ${userId}:`, emailErr)
+                }
 
                 console.log(`Badge awarded: ${milestone.level} (${milestone.percent}%) – ${language.name}`)
             }
@@ -207,12 +211,16 @@ async function awardBadgesAndCertificate(userId: string, languageIdStr: string) 
                 )
 
                 // Send email
-                await EmailService.sendNewCertificate(
-                    user.email,
-                    user.username,
-                    language.name,
-                    "Mastery"
-                )
+                try {
+                    await EmailService.sendNewCertificate(
+                        user.email,
+                        user.username,
+                        language.name,
+                        "Mastery"
+                    )
+                } catch (emailErr) {
+                    console.error(`Failed to send certificate email to user ${userId} for language ${language.name}:`, emailErr)
+                }
 
                 console.log(`Certificate issued: ${fullName} mastered ${language.name}!`)
             } catch (err) {
