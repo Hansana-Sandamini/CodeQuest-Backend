@@ -21,7 +21,7 @@ export const createQuestion = async (req: Request, res: Response) => {
         }
 
         // Check if language exists
-        const language = await Language.findById(languageId);
+        const language = await Language.findById(languageId)
         if (!language) {
             return res.status(404).json({ message: "Language not found" })
         }
@@ -196,17 +196,18 @@ export const getQuestionFull = async (req: Request, res: Response) => {
 }
 
 export const getQuestionById = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params
-    const question = await Question.findById(id)
-      .select("-correctAnswer")  // Hide correctAnswer for MCQ
-      .populate("language", "name iconUrl")
+    try {
+        const { id } = req.params
+        const question = await Question.findById(id)
+            .select("-correctAnswer")  // Hide correctAnswer for MCQ
+            .populate("language", "name iconUrl")
 
-    if (!question) return res.status(404).json({ message: "Question not found" })
+        if (!question) return res.status(404).json({ message: "Question not found" })
 
-    res.json({ data: question })
-  } catch (err) {
-    console.error("Get Question Error:", err)
-    res.status(500).json({ message: "Server error" })
-  }
+        res.json({ data: question })
+        
+    } catch (err) {
+        console.error("Get Question Error:", err)
+        res.status(500).json({ message: "Server error" })
+    }
 }

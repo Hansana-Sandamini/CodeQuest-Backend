@@ -9,6 +9,7 @@ import PDFDocument from "pdfkit"
 import cloudinary from "../config/cloudinary"
 import mongoose from "mongoose"
 import { EmailService } from "../config/mail"
+import { Readable } from 'stream'
 
 export const submitAnswer = async (req: AuthRequest, res: Response) => {
     try {
@@ -107,7 +108,7 @@ function getPoints(difficulty: Difficulty): number {
 
 // BADGES (20–80%) + CERTIFICATE ONLY AT 100%
 async function awardBadgesAndCertificate(userId: string, languageIdStr: string) {
-     const user = await User.findById(userId)
+    const user = await User.findById(userId)
     if (!user || !user.roles.includes(Role.USER)) return  // skip admins
 
     const languageId = new mongoose.Types.ObjectId(languageIdStr)
@@ -136,46 +137,49 @@ async function awardBadgesAndCertificate(userId: string, languageIdStr: string) 
         { percent: 80, level: "Platinum Master", color: "#E5E4E2" },
     ]
 
-    // Award badges if milestone reached and not already owned
-    for (const milestone of badgeMilestones) {
-        if (percentage >= milestone.percent) {
-            const exists = await User.exists({
-                _id: userId,
-                "badges.language": languageId,
-                "badges.level": milestone.level,
-            })
+    // Safe default if badges is undefined
+    const userBadges = user.badges ?? []
 
-            if (!exists) {
-                await User.updateOne(
-                    { _id: userId },
-                    {
-                        $push: {
-                            badges: {
-                                language: languageId,
-                                level: milestone.level,
-                                percentage: milestone.percent,
-                                color: milestone.color,
-                                earnedAt: new Date(),
-                            },
-                        },
-                    }
-                )
+    // Find highest earned badge index for this language
+    const earnedLevels = userBadges
+        .filter(b => b.language.equals(languageId))
+        .map(b => b.level)
 
-                // Send email
-                try {
-                    await EmailService.sendNewBadge(
-                        user.email,
-                        user.username,
-                        milestone.level,
-                        language.name
-                    )
-                } catch (emailErr) {
-                    console.error(`Failed to send email for badge ${milestone.level} to user ${userId}:`, emailErr)
-                }
+    const highestIndex = badgeMilestones.findIndex(
+        m => m.level === earnedLevels[earnedLevels.length - 1]
+    )
 
-                console.log(`Badge awarded: ${milestone.level} (${milestone.percent}%) – ${language.name}`)
+    // Find next badge to award (order-based, NOT percentage-based)
+    const nextBadge = badgeMilestones.find((m, index) => {
+        return percentage >= m.percent && index > highestIndex
+    })
+
+    if (nextBadge) {
+        await User.updateOne(
+            { _id: userId },
+            {
+                $push: {
+                    badges: {
+                        language: languageId,
+                        level: nextBadge.level,
+                        earnedAt: new Date(),
+                    },
+                },
             }
+        )
+
+        // Send email
+        try {
+            await EmailService.sendNewBadge(
+                user.email,
+                user.username,
+                nextBadge.level,
+                language.name
+            )
+        } catch (emailErr) {
+            console.error(`Failed to send email for badge ${nextBadge.level} to user ${userId}:`, emailErr)
         }
+        console.log(`Badge awarded: ${nextBadge.level} (${nextBadge.percent}%) – ${language.name}`)
     }
 
     // CERTIFICATE ONLY AT 100%
@@ -186,7 +190,9 @@ async function awardBadgesAndCertificate(userId: string, languageIdStr: string) 
         })
 
         if (!hasCertificate) {
-            const user = await User.findById(userId).select("firstname lastname username email")
+            const user = await User.findById(userId).select(
+                "firstname lastname username email"
+            )
             if (!user) return
 
             const fullName =
@@ -195,7 +201,11 @@ async function awardBadgesAndCertificate(userId: string, languageIdStr: string) 
                 "CodeQuest Champion"
 
             try {
-                const certificateUrl = await generateCertificate(fullName, language.name, userId)
+                const certificateUrl = await generateCertificate(
+                    fullName,
+                    language.name,
+                    userId
+                )
 
                 await User.updateOne(
                     { _id: userId },
@@ -238,19 +248,20 @@ async function generateCertificate(
 ): Promise<string> {
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({
-            size: "A4",
-            layout: "landscape",
-            margin: 50,
+            size: 'A4',
+            layout: 'landscape',
+            margin: 0,
         })
 
         const chunks: Buffer[] = []
-        doc.on("data", (chunk) => chunks.push(chunk as Buffer))
-        doc.on("end", async () => {
+        doc.on('data', (chunk) => chunks.push(chunk as Buffer))
+        doc.on('end', async () => {
             const pdfBuffer = Buffer.concat(chunks)
 
             try {
                 const result: any = await new Promise((res, rej) => {
-                    cloudinary.uploader.upload_stream(
+                    cloudinary.uploader
+                    .upload_stream(
                         {
                             folder: "codequest_certificates",
                             format: "pdf",
@@ -258,11 +269,9 @@ async function generateCertificate(
                             public_id: `${userId}_${languageName.toLowerCase().replace(/\s+/g, "_")}_certificate`,
                             overwrite: true,
                         },
-                        (error, result) => {
-                            if (error) rej(error)
-                            else res(result)
-                        }
-                    ).end(pdfBuffer)
+                        (error, result) => (error ? rej(error) : res(result))
+                    )
+                    .end(pdfBuffer)
                 })
                 resolve(result.secure_url)
             } catch (err) {
@@ -270,71 +279,146 @@ async function generateCertificate(
                 reject(err)
             }
         })
+        doc.on('error', reject)
 
-        doc.on("error", reject)
+        // DIMENSIONS 
+        const WIDTH = 842
+        const HEIGHT = 595
+        const M_TOP = 45
+        const M_BOTTOM = 50
+        const M_SIDE = 65
+        const CONTENT_W = WIDTH - M_SIDE * 2
+        const CENTER = WIDTH / 2
 
-        const pageWidth = doc.page.width
-        const centerX = pageWidth / 2
+        // Background gradient
+        doc.rect(0, 0, WIDTH, HEIGHT)
+            .fill(doc.linearGradient(0, 0, WIDTH, HEIGHT)
+            .stop(0, '#0f172a')
+            .stop(0.5, '#1e293b')
+            .stop(1, '#0f172a'))
 
-        // Background
-        doc.rect(0, 0, pageWidth, doc.page.height).fill("#f8f9fa")
+        // Corner accents
+        const accent = '#60a5fa'
+        doc.lineWidth(1.8).strokeColor(accent)
+        const cl = 38 // corner length
+        // Top-left
+        doc.moveTo(M_SIDE, M_TOP).lineTo(M_SIDE + cl, M_TOP)
+        doc.moveTo(M_SIDE, M_TOP).lineTo(M_SIDE, M_TOP + cl)
+        // Top-right
+        doc.moveTo(WIDTH - M_SIDE, M_TOP).lineTo(WIDTH - M_SIDE - cl, M_TOP)
+        doc.moveTo(WIDTH - M_SIDE, M_TOP).lineTo(WIDTH - M_SIDE, M_TOP + cl)
+        // Bottom-left + right
+        doc.moveTo(M_SIDE, HEIGHT - M_BOTTOM).lineTo(M_SIDE + cl, HEIGHT - M_BOTTOM)
+        doc.moveTo(M_SIDE, HEIGHT - M_BOTTOM).lineTo(M_SIDE, HEIGHT - M_BOTTOM - cl)
+        doc.moveTo(WIDTH - M_SIDE, HEIGHT - M_BOTTOM).lineTo(WIDTH - M_SIDE - cl, HEIGHT - M_BOTTOM)
+        doc.moveTo(WIDTH - M_SIDE, HEIGHT - M_BOTTOM).lineTo(WIDTH - M_SIDE, HEIGHT - M_BOTTOM - cl)
+        doc.stroke()
 
-        // Title 
-        doc.fontSize(48)
-           .fillColor("#2c3e50")
-           .text("Certificate of Completion", 0, 120, {
-               width: pageWidth,
-               align: "center",
-           })
+        // CONTENT 
+        let y = M_TOP + 15 // start higher
 
-        // Subtitle
-        doc.fontSize(28)
-           .fillColor("#34495e")
-           .text("This certifies that", 0, 220, {
-               width: pageWidth,
-               align: "center",
-           })
+        // 1. Brand
+        doc.font('Helvetica-Bold').fontSize(32).fillColor(accent)
+            .text('CodeQuest', M_SIDE, y, { width: CONTENT_W, align: 'center' })
+        y += 32
 
-        // User Full Name
-        doc.fontSize(42)
-           .fillColor("#e74c3c")
-           .text(userName, 0, 280, {
-               width: pageWidth,
-               align: "center",
-           })
+        // 2. Subtitle
+        doc.font('Helvetica').fontSize(13).fillColor('#94a3b8')
+            .text('MASTER CERTIFICATE', M_SIDE, y, { width: CONTENT_W, align: 'center' })
+        y += 28
 
-        // Achievement
-        doc.fontSize(26)
-           .fillColor("#2c3e50")
-           .text("has successfully mastered all challenges in", 0, 360, {
-               width: pageWidth,
-               align: "center",
-           })
+        // 3. Line
+        doc.lineWidth(1.2).strokeColor(accent)
+            .moveTo(CENTER - 70, y).lineTo(CENTER + 70, y).stroke()
+        y += 35
 
-        // Language Name
-        doc.fontSize(36)
-           .fillColor("#3498db")
-           .text(languageName, 0, 410, {
-               width: pageWidth,
-               align: "center",
-           })
+        // 4. Main title
+        doc.font('Helvetica-Bold').fontSize(34).fillColor('white')
+            .text('CERTIFICATE OF ACHIEVEMENT', M_SIDE, y, { width: CONTENT_W, align: 'center' })
+        y += 50
 
-        // Date
-        doc.fontSize(18)
-           .fillColor("#7f8c8d")
-           .text(
-               `Issued on ${new Date().toLocaleDateString("en-US", {
-                   year: "numeric",
-                   month: "long",
-                   day: "numeric",
-               })}`,
-               0,
-               500,
-               {
-                   width: pageWidth,
-                   align: "center",
-               }
-           )
+        // 5. Presented to
+        doc.font('Helvetica').fontSize(16).fillColor('#cbd5e1')
+            .text('This certificate is proudly presented to', M_SIDE, y, { width: CONTENT_W, align: 'center' })
+        y += 32
+
+        // 6. Name (dynamic size)
+        let nameSize = 50
+        if (userName.length > 26) nameSize = 40
+        else if (userName.length > 20) nameSize = 44
+
+        doc.font('Helvetica-Bold').fontSize(nameSize).fillColor(accent)
+            .text(userName, M_SIDE, y, { width: CONTENT_W, align: 'center' })
+        y += nameSize * 1.25
+
+        // 7. For mastering
+        doc.font('Helvetica').fontSize(18).fillColor('#e2e8f0')
+            .text(`for successfully mastering`, M_SIDE, y, { width: CONTENT_W, align: 'center' })
+        y += 38
+
+        // 8. Language badge 
+        const badgeW = 340
+        const badgeH = 68
+        const badgeX = CENTER - badgeW / 2
+        const badgeY = y
+
+        doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 10)
+            .fill('#1e293b')
+            .stroke(accent)
+            .lineWidth(2)
+
+        let langSize = 34
+        if (languageName.length > 18) langSize = 28
+
+        doc.font('Helvetica-Bold').fontSize(langSize).fillColor(accent)
+        .text(languageName, badgeX, badgeY + badgeH / 2 - langSize / 2.4, {
+            width: badgeW,
+            align: 'center',
+            lineBreak: false
+        })
+
+        y += badgeH + 45
+
+        // 9. Date section
+        const dateStr = new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })
+
+        doc.font('Helvetica').fontSize(15).fillColor('#cbd5e1')
+            .text('Issued on', M_SIDE, y, { width: CONTENT_W, align: 'center' })
+        y += 22
+
+        doc.font('Helvetica-Bold').fontSize(20).fillColor('white')
+            .text(dateStr, M_SIDE, y, { width: CONTENT_W, align: 'center' })
+
+        // 10. Optional small seal (centered, low)
+        const sealY = y + 45
+        if (sealY < HEIGHT - M_BOTTOM - 40) {
+            doc.circle(CENTER, sealY, 24)
+                .fill('#0f172a')
+                .stroke(accent)
+                .lineWidth(2)
+
+            doc.font('Helvetica-Bold').fontSize(32).fillColor(accent)
+                .text('✓', CENTER - 10, sealY - 18)
+        }
+
+        // FOOTER
+        const footerY = HEIGHT - M_BOTTOM - 35
+        doc.font('Helvetica').fontSize(10).fillColor('#cbd5e1')
+            .text('Verified by CodeQuest Learning Platform', M_SIDE, footerY, {
+                width: CONTENT_W,
+                align: 'center'
+            })
+
+        const certId = `CQ-${userId.slice(-8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`
+        doc.font('Helvetica').fontSize(8).fillColor('#cbd5e1')
+            .text(`Certificate ID: ${certId}`, M_SIDE, footerY + 16, {
+                width: CONTENT_W,
+                align: 'center'
+            })
 
         doc.end()
     })

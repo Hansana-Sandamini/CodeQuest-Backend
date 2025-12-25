@@ -58,14 +58,14 @@ const progressSchema = new Schema<IProgress>(
 )
 
 // One progress per user per question
-progressSchema.index({ user: 1, question: 1 }, { unique: true });
+progressSchema.index({ user: 1, question: 1 }, { unique: true })
 
 // Fast queries for dashboard (e.g., "show all completed today")
-progressSchema.index({ user: 1, status: 1 });
-progressSchema.index({ user: 1, completedAt: -1 });
-progressSchema.index({ user: 1, difficulty: 1 });
+progressSchema.index({ user: 1, status: 1 })
+progressSchema.index({ user: 1, completedAt: -1 })
+progressSchema.index({ user: 1, difficulty: 1 })
 
 // Fast leaderboard by points
-progressSchema.index({ user: 1, pointsEarned: -1 });
+progressSchema.index({ user: 1, pointsEarned: -1 })
 
 export const Progress = mongoose.model<IProgress>("Progress", progressSchema)

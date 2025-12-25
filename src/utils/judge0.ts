@@ -54,7 +54,7 @@ export async function executeCode(
                     },
                 }
             )
-            attempts++;
+            attempts++
             if (attempts > 10) throw new Error("Timeout waiting for Judge0 result")
         } while (statusResponse.data.status.id <= 2) // 1: in queue, 2: processing
 
