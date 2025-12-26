@@ -22,7 +22,7 @@ app.use(express.json())
 
 app.use(
     cors({ 
-        origin: ["http://localhost:5173"],
+        origin: ["http://localhost:5173", "https://code-quest-pied.vercel.app"],
         methods: ["GET", "POST", "PUT", "DELETE"]
     })
 )
