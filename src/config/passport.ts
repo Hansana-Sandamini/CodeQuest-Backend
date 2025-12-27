@@ -8,10 +8,6 @@ dotenv.config()
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!
-// const CALLBACK_URL = process.env.NODE_ENV === 'production'
-//     ? 'https://your-api-domain.com/api/v1/auth/google/callback'
-//     : 'http://localhost:5000/api/v1/auth/google/callback'
-
 
 const CALLBACK_URL ='https://code-quest-be-three.vercel.app/api/v1/auth/google/callback'
 
