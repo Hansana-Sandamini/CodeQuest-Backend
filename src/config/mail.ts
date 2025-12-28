@@ -104,7 +104,7 @@ const getWelcomeEmail = (to: string, username: string): EmailOptions => {
                 </div>
                 
                 <div style="text-align: center; margin: 40px 0;">
-                    <a href="${process.env.FRONTEND_URL}/challenges" 
+                    <a href="${process.env.FRONTEND_URL}/languages" 
                        style="background-color: #10B981; color: white; padding: 14px 28px; 
                               text-decoration: none; border-radius: 8px; font-weight: bold;
                               font-size: 16px; display: inline-block;">
@@ -172,7 +172,10 @@ const getNewBadgeEmail = (to: string, data: { username: string, badgeName: strin
     }
 }
 
-const getNewCertificateEmail = (to: string, data: { username: string, language: string, level: string }): EmailOptions => {
+const getNewCertificateEmail = (to: string, data: { username: string, language: string, level: string, certificateUrl?: string }): EmailOptions => {
+    const certificateLink = data.certificateUrl 
+        ? `<a href="${data.certificateUrl}" target="_blank">View and Download Certificate</a>`
+        : `<a href="${process.env.FRONTEND_URL}/profile" target="_blank">View Your Certificate</a>`
     return {
         to,
         subject: `🎓 Certificate Earned in ${data.language}!`,
@@ -209,7 +212,7 @@ const getNewCertificateEmail = (to: string, data: { username: string, language: 
                 </p>
                 
                 <div style="text-align: center; margin: 40px 0;">
-                    <a href="${process.env.FRONTEND_URL}/certificates" 
+                    <a href="${certificateLink}" 
                        style="background-color: #10B981; color: white; padding: 14px 28px; 
                               text-decoration: none; border-radius: 8px; font-weight: bold;
                               font-size: 16px; display: inline-block;">
@@ -223,7 +226,7 @@ const getNewCertificateEmail = (to: string, data: { username: string, language: 
                 </p>
             </div>
         `,
-        text: `🎓 Certificate Earned!\n\nCongratulations ${data.username}!\n\nYou've earned a ${data.level} level certificate in ${data.language}!\n\nView your certificate: ${process.env.FRONTEND_URL}/certificates`
+        text: `🎓 Certificate Earned!\n\nCongratulations ${data.username}!\n\nYou've earned a ${data.level} level certificate in ${data.language}!\n\nView your certificate: ${process.env.FRONTEND_URL}/profile`
     }
 }
 
@@ -267,8 +270,8 @@ export const EmailService = {
     sendNewBadge: (to: string, username: string, badgeName: string, language: string) => 
         sendEmailService(EmailType.NEW_BADGE, to, { username, badgeName, language }),
     
-    sendNewCertificate: (to: string, username: string, language: string, level: string) => 
-        sendEmailService(EmailType.NEW_CERTIFICATE, to, { username, language, level }),
+    sendNewCertificate: (to: string, username: string, language: string, level: string, certificateUrl?: string) => 
+        sendEmailService(EmailType.NEW_CERTIFICATE, to, { username, language, level, certificateUrl }),
 
     sendPasswordResetOtp: (to: string, otp: string) =>
         sendEmailService(EmailType.PASSWORD_RESET_OTP, to, { otp }),

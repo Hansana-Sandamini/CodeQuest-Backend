@@ -226,7 +226,8 @@ async function awardBadgesAndCertificate(userId: string, languageIdStr: string) 
                         user.email,
                         user.username,
                         language.name,
-                        "Mastery"
+                        "Mastery",
+                        certificateUrl
                     )
                 } catch (emailErr) {
                     console.error(`Failed to send certificate email to user ${userId} for language ${language.name}:`, emailErr)

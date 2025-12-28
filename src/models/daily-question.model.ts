@@ -16,6 +16,4 @@ const dailyQuestionSchema = new Schema(
     { timestamps: true }
 )
 
-dailyQuestionSchema.index({ date: 1 }, { unique: true })
-
 export const DailyQuestion = model("DailyQuestion", dailyQuestionSchema)

@@ -12,7 +12,7 @@ import progressRouter from "./routes/progress.routes"
 import leaderboardRouter from "./routes/leaderboard.routes"
 import userRouter from "./routes/user.routes"
 import googleAuthRouter from './routes/google-auth.routes'
-import dailyQuestionRoutes from "./routes/daily-question.routes"
+import dailyQuestionRouter from "./routes/daily-question.routes"
 
 dotenv.config()
 
@@ -36,7 +36,7 @@ app.use("/api/v1/hints", hintRouter)
 app.use("/api/v1/progress", progressRouter)
 app.use("/api/v1/leaderboard", leaderboardRouter)
 app.use("/api/v1/users", userRouter)
-app.use("/api/v1/daily-question", dailyQuestionRoutes)
+app.use("/api/v1/daily-question", dailyQuestionRouter)
 
 const startServer = async () => {
     try {
